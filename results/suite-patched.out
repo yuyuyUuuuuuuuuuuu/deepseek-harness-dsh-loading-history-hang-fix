@@ -1,0 +1,37 @@
+=== 1. regression (must match unpatched baseline) ===
+--- 0.1.6-alpha.1-fixtest ---
+  PASS  happy path: two items delivered  (got 1,2)
+  PASS  terminal error propagates  (bad protocol)
+  PASS  dispose() completes while awaiting opening item
+  PASS  carrier retry within budget still works  (gen2)
+=== 2. adversarial ===
+--- 0.1.6-alpha.1-fixtest ---
+  PASS  fast yield unaffected by deadline  (gen1)
+  PASS  dispose during pending deadline is clean
+  PASS  normal live tail keeps flowing (no spurious timeout)  (gens=1 got=late-entry)
+=== 3. healthy slow opens must NOT be restarted (defect 12 guard) ===
+    slow open 1000ms -> delivered gen1  (1.0s, gens=1)
+    slow open 3000ms -> delivered gen1  (3.0s, gens=1)
+    slow open 6000ms -> delivered gen1  (6.0s, gens=1)
+    slow open 7500ms -> delivered gen1  (7.5s, gens=1)
+=== 4. listener isolation (defect 14 guard) ===
+  PASS  projection session/event handler is exception-isolated
+=== 5. 100 poison shapes x4 seed sets (clientTHREW must be 0) ===
+  0.1.6-alpha.1-fixtest      poisonCases=100  clientOK=100  clientTHREW=0  rejectedAtRestore=0
+  0.1.6-alpha.1-fixtest      poisonCases=100  clientOK=100  clientTHREW=0  rejectedAtRestore=0
+  0.1.6-alpha.1-fixtest      poisonCases=100  clientOK=100  clientTHREW=0  rejectedAtRestore=0
+  0.1.6-alpha.1-fixtest      poisonCases=100  clientOK=100  clientTHREW=0  rejectedAtRestore=0
+=== 6. sanitizer must not alter valid sessions ===
+  clean sessions compared: 200  differences: 0
+  => 正常データは一切変わらない
+=== 7. 100-run randomized stress (HANG must be 0) ===
+    ...20/100
+    ...40/100
+    ...60/100
+    ...80/100
+    ...100/100
+
+  RUNTIME: 0.1.6-alpha.1-fixtest
+  runs=100  delivered=100  error=0  HANG=0  slow(>10s)=0  worst=7.6s
+
+SUITE PASS

@@ -1,0 +1,25 @@
+### installer-produced tree (what production will run) ###
+    ...20/100
+    ...40/100
+    ...60/100
+    ...80/100
+    ...100/100
+
+  RUNTIME: 0.1.6-alpha.1-patched
+  runs=100  delivered=100  error=0  HANG=0  slow(>10s)=0  worst=7.6s
+### pristine control ###
+    ...20/100
+    ...40/100
+    ...60/100
+    ...80/100
+    ...100/100
+
+  RUNTIME: 0.1.6-alpha.1
+  runs=100  delivered=55  error=0  HANG=45  slow(>10s)=0  worst=0.1s
+  first hangs:
+    {"seed":31676,"res":"HANG","how":"delivered(genundefined)","gens":2,"stallUntil":3,"blipAt":24,"killSocket":false,"ms":1501}
+    {"seed":39595,"res":"HANG","how":"delivered(genundefined)","gens":2,"stallUntil":3,"blipAt":41,"killSocket":false,"ms":1502}
+    {"seed":63352,"res":"HANG","how":"delivered(genundefined)","gens":2,"stallUntil":4,"blipAt":32,"killSocket":false,"ms":1500}
+    {"seed":71271,"res":"HANG","how":"delivered(genundefined)","gens":2,"stallUntil":4,"blipAt":49,"killSocket":false,"ms":1501}
+    {"seed":79190,"res":"HANG","how":"delivered(genundefined)","gens":2,"stallUntil":4,"blipAt":6,"killSocket":false,"ms":1502}
+DONE

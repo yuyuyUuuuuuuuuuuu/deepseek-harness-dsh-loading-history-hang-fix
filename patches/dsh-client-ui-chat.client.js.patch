@@ -1,0 +1,15 @@
+--- client.js
++++ client.js
+@@ -8365,7 +8365,11 @@
+ 									increaseTitle: true
+ 								}).then((childId) => {
+ 									ctx.sessions.open(childId);
+-								}).catch(() => {});
++								}).catch((error) => {
++									// No error surface is wired here; at minimum do not discard
++									// the reason, or a failed fork is an inert button.
++									console.error("[chat] fork failed:", error);
++								});
+ 							}
+ 						};
+ 					}

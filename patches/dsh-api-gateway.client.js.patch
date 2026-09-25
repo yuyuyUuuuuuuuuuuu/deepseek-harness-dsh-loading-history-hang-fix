@@ -1,0 +1,67 @@
+--- client.js
++++ client.js
+@@ -845,6 +845,12 @@
+ 				let attempt = 0;
+ 				let generation = 0;
+ 				let observedRevision = this.revision;
++				const OPENING_ITEM_TIMEOUT_COLD_MS = 20000;
++				const OPENING_ITEM_TIMEOUT_RECOVERY_MS = 2500;
++				const OPENING_ITEM_TIMEOUT_MAX_MS = 20000;
++				let openingStalls = 0;
++				const startRevision = this.revision;
++				let disrupted = false;
+ 				try {
+ 					while (!isAborted(this.lifetime.signal)) {
+ 						if (observedRevision !== this.revision) {
+@@ -852,13 +858,35 @@
+ 							attempt = 0;
+ 						}
+ 						const revision = this.revision;
++						// Any generation after the first is by definition recovering, and so
++						// is one starting after the revision moved (an external restart()).
++						if (generation > 0 || this.revision !== startRevision) disrupted = true;
+ 						const generationAbort = new AbortController();
+ 						this.generationAbort = generationAbort;
+ 						const signal = AbortSignal.any([this.lifetime.signal, generationAbort.signal]);
+ 						const generationId = ++generation;
+ 						let accepted = false;
++						let openingItemStalled = false;
+ 						try {
++							let sawOpeningItem = false;
++							const openingDeadline = setTimeout(() => {
++								if (sawOpeningItem) return;
++								if (this.generationAbort !== generationAbort) return;
++								if (generationAbort.signal.aborted) return;
++								openingItemStalled = true;
++								openingStalls++;
++								this.revision++;
++								generationAbort.abort(new RemoteStreamCarrierError(`${this.options.name} opening item stalled`));
++							}, disrupted
++								? Math.min(OPENING_ITEM_TIMEOUT_MAX_MS, OPENING_ITEM_TIMEOUT_RECOVERY_MS * 2 ** openingStalls)
++								: OPENING_ITEM_TIMEOUT_COLD_MS);
++							if (typeof openingDeadline?.unref === "function") openingDeadline.unref();
++							try {
+ 							for await (const value of this.options.open(signal)) {
++								sawOpeningItem = true;
++								openingStalls = 0;
++								disrupted = false;
++								clearTimeout(openingDeadline);
+ 								if (isAborted(this.lifetime.signal)) return;
+ 								if (revision !== this.revision) break;
+ 								yield {
+@@ -872,11 +900,15 @@
+ 									}
+ 								};
+ 							}
++							} finally {
++								clearTimeout(openingDeadline);
++							}
+ 							if (isAborted(this.lifetime.signal)) return;
+ 							if (revision !== this.revision) continue;
+ 							throw this.options.ended(accepted);
+ 						} catch (error) {
+ 							if (isAborted(this.lifetime.signal)) return;
++							if (openingItemStalled) continue;
+ 							if (revision !== this.revision) continue;
+ 							if (!(error instanceof RemoteStreamCarrierError)) throw terminalStreamFailure(error);
+ 							this.options.carrierFailed?.(error);

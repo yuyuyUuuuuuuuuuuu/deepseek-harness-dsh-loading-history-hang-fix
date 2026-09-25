@@ -1,0 +1,32 @@
+--- index.js
++++ index.js
+@@ -1229,10 +1229,25 @@
+ 					this.activeAttempt = void 0;
+ 					break;
+ 				}
+-				attempt.stream.push({
+-					time: frame.time,
+-					chunk: frame.chunk
+-				});
++				try {
++					attempt.stream.push({
++						time: frame.time,
++						chunk: frame.chunk
++					});
++				} catch (error) {
++					// A chunk that is not losslessly JSON-serializable (e.g. a provider
++					// usage record with a non-finite token count) would throw here.
++					// This runs inside a ctx.on handler and cordis emit() does not
++					// isolate listeners, so rethrowing would stop every later
++					// agent/assistant-stream listener -- including the one that streams
++					// to connected browsers. Drop this attempt's live baseline instead:
++					// the durable session log is written by a different path and stays
++					// intact, so history still loads.
++					this.ctx?.logger?.warn?.(`assistant stream chunk rejected: ${error instanceof Error ? error.message : String(error)}`);
++					this.activeAttempt = void 0;
++					this.dirty = true;
++					break;
++				}
+ 				attempt.nextIndex += 1;
+ 				break;
+ 			}

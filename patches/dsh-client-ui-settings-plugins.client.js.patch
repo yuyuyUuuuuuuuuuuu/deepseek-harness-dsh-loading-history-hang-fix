@@ -1,0 +1,49 @@
+--- client.js
++++ client.js
+@@ -926,7 +926,16 @@
+ 				this.failed = false;
+ 				this.publish();
+ 				let landed = true;
+-				for (const write of writes) landed = await write() && landed;
++				try {
++					for (const write of writes) landed = await write() && landed;
++				} catch (error) {
++					// Never leave saving=true: the guard above would block every future
++					// save for the life of this view.
++					this.saving = false;
++					this.failed = true;
++					this.publish();
++					throw error;
++				}
+ 				if (landed) this.staged.clear();
+ 				this.saving = false;
+ 				this.failed = !landed;
+@@ -1363,7 +1372,13 @@
+ 						model: route.model
+ 					}))
+ 				}], this.draftRevision);
+-				if (generation !== this.saveGeneration) return;
++				if (generation !== this.saveGeneration) {
++					// Superseded: clear the busy flag anyway, otherwise this view stays
++					// "saving" forever and refuses further saves.
++					this.saving = false;
++					this.publish();
++					return;
++				}
+ 				const landed = this.currentEnabled() === desiredEnabled && sameRoutes(this.currentRoutes(), desired);
+ 				this.saving = false;
+ 				this.failed = !landed;
+@@ -1395,7 +1410,12 @@
+ 				this.catalogPartial = false;
+ 				this.publish();
+ 				const response = await this.ctx.remote.session.modelCatalog();
+-				if (generation !== this.catalogGeneration) return;
++				if (generation !== this.catalogGeneration) {
++					// Superseded: fall back to "idle" so a later load can re-drive. Leaving
++					// "loading" would deadlock against the guard at the top of this method.
++					if (this.catalogStatus === "loading") this.catalogStatus = "idle";
++					return;
++				}
+ 				if (response.ok) {
+ 					this.catalogGroups = response.value.groups;
+ 					this.catalogPartial = response.value.failures.length > 0;

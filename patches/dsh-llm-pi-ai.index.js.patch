@@ -1,0 +1,25 @@
+--- index.js
++++ index.js
+@@ -1358,12 +1358,17 @@
+ *   when non-zero (pi-ai reports zeros, not absence).
+ */
+ function mapUsage(usage) {
++	// Provider counts are untrusted: a missing field, undefined, NaN or Infinity
++	// makes the resulting usage chunk non-lossless, which throws downstream and
++	// strands the session's history view. Normalise to safe integers here.
++	const count = (value) => Number.isFinite(value) ? Math.trunc(value) : 0;
++	const source = usage === null || typeof usage !== "object" ? {} : usage;
+ 	return {
+-		inputTokens: usage.input,
+-		outputTokens: usage.output,
+-		totalTokens: usage.totalTokens,
+-		...usage.cacheRead > 0 ? { cacheReadTokens: usage.cacheRead } : {},
+-		...usage.cacheWrite > 0 ? { cacheWriteTokens: usage.cacheWrite } : {}
++		inputTokens: count(source.input),
++		outputTokens: count(source.output),
++		totalTokens: count(source.totalTokens),
++		...count(source.cacheRead) > 0 ? { cacheReadTokens: count(source.cacheRead) } : {},
++		...count(source.cacheWrite) > 0 ? { cacheWriteTokens: count(source.cacheWrite) } : {}
+ 	};
+ }
+ function classifyPiAiError(message) {

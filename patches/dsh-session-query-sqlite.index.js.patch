@@ -1,0 +1,19 @@
+--- index.js
++++ index.js
+@@ -610,7 +610,15 @@
+ 		this._localGeneration = state.global_generation;
+ 	}
+ 	async _ensureReady(signal) {
+-		this._ready ??= this._open();
++		if (this._ready === void 0) {
++			const attempt = this._open();
++			// Do not cache a rejection: a transient open failure would otherwise
++			// disable search permanently until restart.
++			attempt.catch(() => {
++				if (this._ready === attempt) this._ready = void 0;
++			});
++			this._ready = attempt;
++		}
+ 		try {
+ 			await waitWithAbort(this._ready, signal);
+ 		} catch (error) {

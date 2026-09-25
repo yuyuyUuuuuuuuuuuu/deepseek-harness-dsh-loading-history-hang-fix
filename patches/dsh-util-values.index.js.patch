@@ -1,0 +1,11 @@
+--- index.js
++++ index.js
+@@ -15,7 +15,7 @@
+ 	const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+ 	if (typeof constructor !== "function") return false;
+ 	try {
+-		return constructor.name === name && constructor.prototype === prototype && Function.prototype.toString.call(constructor) === `function ${name}() { [native code] }`;
++		return constructor.name === name && constructor.prototype === prototype && Function.prototype.toString.call(constructor).replace(/\s+/g, " ") === `function ${name}() { [native code] }` /* Safari/JSC prints native fns with newlines */;
+ 	} catch {
+ 		return false;
+ 	}

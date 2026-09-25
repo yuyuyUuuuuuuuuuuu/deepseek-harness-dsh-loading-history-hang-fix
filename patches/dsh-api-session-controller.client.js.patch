@@ -1,0 +1,117 @@
+--- client.js
++++ client.js
+@@ -1011,7 +1011,7 @@
+ 			const constructor = Object.getOwnPropertyDescriptor(prototype, "constructor")?.value;
+ 			if (typeof constructor !== "function") return false;
+ 			try {
+-				return constructor.name === name && constructor.prototype === prototype && Function.prototype.toString.call(constructor) === `function ${name}() { [native code] }`;
++				return constructor.name === name && constructor.prototype === prototype && Function.prototype.toString.call(constructor).replace(/\s+/g, " ") === `function ${name}() { [native code] }` /* Safari/JSC prints native fns with newlines */;
+ 			} catch {
+ 				return false;
+ 			}
+@@ -1686,6 +1686,9 @@
+ 				}
+ 				if (!result.ok) {
+ 					if (requestId !== void 0) this.retireFailedSubmission(requestId);
++					// The turn never started, so none of the turn-driven resets will fire:
++					// clear the pending bit here or the view waits for a turn forever.
++					this.firstPromptPendingTurn = false;
+ 					this.promptError = {
+ 						op: "send",
+ 						error: result.error
+@@ -1976,6 +1979,18 @@
+ 				this.events = void 0;
+ 				await events?.dispose();
+ 			}
++			/**
++			* A superseded generation must not leave the view in "loading": openPromise
++			* is cleared by open()'s finally, and the stage refuses to re-open an
++			* already-watched session, so a stranded "loading" never recovers without a
++			* full reload. Demote to "cold" so the next open() re-drives it.
++			*/
++			abandonSupersededOpen() {
++				if (this.openState !== "loading") return;
++				this.openState = "cold";
++				this.openError = null;
++				this.notifier.markDirty();
++			}
+ 			/** @param generation - openGeneration at launch; stale passes cannot publish after replacement. */
+ 			async doOpen(generation) {
+ 				this.openState = "loading";
+@@ -1993,14 +2008,24 @@
+ 				this.events = events;
+ 				try {
+ 					await events.open({ maxMessages: 50 });
+-					if (generation !== this.openGeneration || this.events !== events) return;
++					if (generation !== this.openGeneration || this.events !== events) return this.abandonSupersededOpen();
+ 					this.openState = "open";
+ 				} catch (error) {
+-					if (generation !== this.openGeneration || this.events !== events) return;
+-					if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
++					if (generation !== this.openGeneration || this.events !== events) return this.abandonSupersededOpen();
+ 					this.events = void 0;
+ 					this.openState = "error";
+-					this.openError = error;
++					this.openError = (0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)
++						? error
++						: { code: "session/history-unreadable", message: error instanceof Error ? error.message : String(error) };
++					// A non-remote failure here is a malformed history record (e.g. an
++					// assistant-stream chunk that fails validation). Rethrowing would
++					// escape as an unhandled rejection and leave openState === "loading"
++					// forever -- the view then shows "Loading history..." and no reload
++					// recovers it, because the same record is replayed every time.
++					// Publish it as an error state instead: that is recoverable.
++					if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) {
++						try { console.error("[session] history could not be read:", error); } catch {}
++					}
+ 				} finally {
+ 					if (generation === this.openGeneration) this.notifier.markDirty();
+ 				}
+@@ -2444,13 +2469,16 @@
+ 							error: result.error
+ 						});
+ 					} catch (error) {
+-						if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
++						// Write the error row before any rethrow (see refreshList): the
++						// finally clears catalogInflight only, so a rethrow would strand
++						// this catalog in its loading state.
+ 						this.catalogs.set(parentSessionId, {
+ 							entries: this.withCatalogMutations(previous?.entries ?? [], expandableRows, activityRows),
+ 							...catalogAvailability(this.catalogInflight.get(parentSessionId)?.parentAvailableOverride ?? previous?.parentAvailable),
+ 							state: "error",
+ 							error
+ 						});
++						if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
+ 					} finally {
+ 						this.catalogInflight.delete(parentSessionId);
+ 						if (this.catalogStale.delete(parentSessionId)) this.refreshSubagents(parentSessionId);
+@@ -2526,9 +2554,12 @@
+ 							this.listError = result.error;
+ 						}
+ 					} catch (error) {
+-						if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
++						// Record the failure before any rethrow: the finally below clears
++						// listInflight only, so leaving listState === "loading" strands the
++						// sidebar in a permanent loading state.
+ 						this.listState = "error";
+ 						this.listError = error;
++						if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
+ 					} finally {
+ 						this.listMutations = null;
+ 						this.listInflight = null;
+@@ -3310,7 +3341,14 @@
+ 			followCurrent() {
+ 				const snapshot = this.list.getSnapshot();
+ 				const current = snapshot.current;
+-				if (current === void 0 || snapshot.byId[current] === void 0 || current === this.watched) return;
++				if (current === void 0 || snapshot.byId[current] === void 0) return;
++				if (current === this.watched) {
++					// Already watched: re-drive a session that was left un-opened (a
++					// superseded open demotes to "cold"), otherwise nothing would ever
++					// re-open it while it stays selected. open() is idempotent.
++					this.resolve(current)?.session.open();
++					return;
++				}
+ 				this.watched = current;
+ 				this.sweepDeferred();
+ 				const record = this.resolve(current);

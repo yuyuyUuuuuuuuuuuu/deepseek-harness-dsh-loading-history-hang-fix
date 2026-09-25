@@ -1,0 +1,44 @@
+--- client.js
++++ client.js
+@@ -988,11 +988,20 @@
+ 					s.status = "loading";
+ 					s.error = null;
+ 				});
+-				const [registered, declared] = await Promise.all([
+-					this.ctx.remote.llm.listProviders(),
+-					this.ctx.remote.llm.listConfigurableProviders(),
+-					this.describeFace.ensure()
+-				]);
++				let registered;
++				let declared;
++				try {
++					[registered, declared] = await Promise.all([
++						this.ctx.remote.llm.listProviders(),
++						this.ctx.remote.llm.listConfigurableProviders(),
++						this.describeFace.ensure()
++					]);
++				} catch (error) {
++					// Without this the panel stays on "loading" forever: the rejection
++					// escapes before any failLoad() call can publish the error.
++					this.failLoad(generation, error instanceof Error ? error.message : String(error));
++					return;
++				}
+ 				if (!registered.ok) {
+ 					this.failLoad(generation, registered.error.message);
+ 					return;
+@@ -2520,6 +2529,15 @@
+ 				});
+ 				try {
+ 					await this.scope.set(WELCOME_NOTICE_ACK_FIELD, WELCOME_NOTICE_VERSION);
++				} catch (error) {
++					// The throw below skips derive(), so clear the visible "saving"
++					// state here or the view stays busy forever.
++					this.saving = false;
++					this.store.update((state) => {
++						state.status = "error";
++						state.error = error instanceof Error ? error.message : String(error);
++					});
++					throw error;
+ 				} finally {
+ 					this.saving = false;
+ 				}

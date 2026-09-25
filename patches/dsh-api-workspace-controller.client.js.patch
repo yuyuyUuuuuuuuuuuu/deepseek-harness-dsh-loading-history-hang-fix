@@ -1,0 +1,16 @@
+--- client.js
++++ client.js
+@@ -178,10 +178,12 @@
+ 			* @param error - terminal stream failure.
+ 			*/
+ 			handleStreamFailure(error) {
+-				if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
++				// Publish the failure before any rethrow: handleCarrierFailure() parks
++				// this view in "loading", so a rethrow here would strand it there.
+ 				this.state = "error";
+ 				this.error = error;
+ 				this.invalidate();
++				if (!(0, _deepseek_ai_dsh_api_gateway_client.isRemoteFailure)(error)) throw error;
+ 			}
+ 			/**
+ 			* Subscribe to Workspace state invalidation.

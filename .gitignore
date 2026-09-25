@@ -1,0 +1,16 @@
+# written by install.sh (records which version to roll back to)
+.installed-from
+
+# local installs of test dependencies (e.g. npm install playwright-core)
+node_modules/
+package-lock.json
+
+# leftovers from applying patches by hand
+*.orig
+*.rej
+
+# local logs, scratch output and editor/OS files
+*.log
+*.tmp
+.DS_Store
+*~

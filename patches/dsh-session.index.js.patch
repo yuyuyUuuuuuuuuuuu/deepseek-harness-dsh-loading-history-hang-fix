@@ -1,0 +1,78 @@
+--- index.js
++++ index.js
+@@ -1,7 +1,7 @@
+ import { Service } from "@deepseek-ai/cordis";
+ import { isAbsolute } from "node:path";
+ import { brandNumber, brandString } from "@deepseek-ai/dsh-brand";
+-import { assertNever, deepFreeze, snapshotJsonValue } from "@deepseek-ai/dsh-util-values";
++import { assertNever, deepFreeze, isJsonValue, snapshotJsonValue } from "@deepseek-ai/dsh-util-values";
+ import { scopeOf, scopeTarget } from "@deepseek-ai/dsh-scope";
+ import { callConfigEquals } from "@deepseek-ai/dsh-llm";
+ //#region lib/types/types.js
+@@ -848,6 +848,46 @@
+ 	return deepFreeze(record);
+ }
++/**
++* Replace values that cannot survive a JSON round trip with null, so a session
++* restored from disk can always be opened. Used only on the restore path, where
++* embedded Assistant streams are otherwise adopted unvalidated.
++* @param value - the restored seed event.
++* @returns an equivalent value containing only lossless JSON data.
++*/
++function sanitizeRestoredEvent(value) {
++	const seen = new WeakSet();
++	const walk = (input) => {
++		if (input === null) return null;
++		const kind = typeof input;
++		if (kind === "string" || kind === "boolean") return input;
++		if (kind === "number") return Number.isFinite(input) ? input : null;
++		if (kind !== "object") return null;
++		if (seen.has(input)) return null;
++		seen.add(input);
++		if (Array.isArray(input)) {
++			const out = [];
++			for (let index = 0; index < input.length; index += 1) out.push(walk(input[index]));
++			seen.delete(input);
++			return out;
++		}
++		const out = {};
++		for (const key of Object.keys(input)) {
++			let member;
++			try {
++				member = input[key];
++			} catch {
++				continue;
++			}
++			if (member === void 0 || typeof member === "function" || typeof member === "symbol") continue;
++			out[key] = walk(member);
++		}
++		seen.delete(input);
++		return out;
++	};
++	return walk(value);
++}
++
+ /** Validate and freeze one exclusively owned persistence header in place. */
+ function validateRestoredSessionHeader(id, input) {
+ 	if (input !== null && typeof input === "object" && !Array.isArray(input)) {
+ 		const prototype = Reflect.getPrototypeOf(input);
+@@ -1123,7 +1163,18 @@
+ 		this.surfaceManager = new SurfaceManager(this.log, SessionLogOffset(0), projections);
+ 		const restoredHeader = mode === "snapshot" ? void 0 : validateRestoredSessionHeader(id, header);
+ 		if (seed !== void 0) for (const [index, source] of seed.entries()) {
+-			const snapshot = mode === "snapshot" ? snapshotJsonValue(source) : source;
++			let snapshot = mode === "snapshot" ? snapshotJsonValue(source) : source;
++			if (mode !== "snapshot" && snapshot !== void 0 && !isJsonValue(snapshot)) {
++				// Restored-from-disk events are normally adopted without copying, which
++				// leaves any non-lossless embedded Assistant stream to blow up later in
++				// whichever consumer expands it (expandAssistantStream()). Repair it here instead
++				// so history still loads.
++				// NOTE: JSON.stringify() alone is not enough -- it THROWS on BigInt,
++				// circular structures and a throwing toJSON(), which would turn an
++				// unreadable session into an unopenable one. Walk it defensively and
++				// replace anything unrepresentable with null.
++				snapshot = sanitizeRestoredEvent(snapshot);
++			}
+ 			if (snapshot === void 0) throw new Error(`seed event at index ${index} is not losslessly JSON-serializable`);
+ 			assertSessionEventEnvelope(snapshot, index);
+ 			if (snapshot.seq !== index) throw new Error(`seed event at index ${index} has seq ${snapshot.seq} (expected ${index}); seed must be contiguous from 0`);

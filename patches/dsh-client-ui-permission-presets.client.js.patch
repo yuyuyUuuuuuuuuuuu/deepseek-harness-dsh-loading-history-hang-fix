@@ -1,0 +1,32 @@
+--- client.js
++++ client.js
+@@ -695,7 +695,14 @@
+ 					state.status = "loading";
+ 					state.error = null;
+ 				});
+-				await this.describeFace.ensure();
++				try {
++					await this.describeFace.ensure();
++				} catch (error) {
++					// Without this the panel stays on "loading" forever: the throw
++					// skips derive(), and load() is not re-driven on its own.
++					if (!this.disposed) this.fail(error instanceof Error ? error : new Error(String(error)));
++					return;
++				}
+ 				this.derive();
+ 			}
+ 			/**
+@@ -722,6 +729,13 @@
+ 						path: ["defaultPreset"],
+ 						value: preset
+ 					}], view.revision);
++				} catch (error) {
++					// Clear the visible "saving" state before the throw escapes: the
++					// finally below only clears the re-entry guard, so the row would
++					// otherwise stay "saving" forever.
++					this.saving = false;
++					if (!this.disposed) this.fail(error instanceof Error ? error : new Error(String(error)));
++					throw error;
+ 				} finally {
+ 					this.saving = false;
+ 				}

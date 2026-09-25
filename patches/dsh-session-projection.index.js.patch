@@ -1,0 +1,18 @@
+--- index.js
++++ index.js
+@@ -62,7 +62,14 @@
+ 			}
+ 		});
+ 		ctx.on("session/event", (session, event) => {
+-			this.drive(session, event);
++			try {
++				this.drive(session, event);
++			} catch (error) {
++				// cordis emit() does not isolate listeners: rethrowing here would stop
++				// every later session/event listener, including the one that streams
++				// events to connected clients (socket open, nothing arrives).
++				this.ctx.logger?.warn?.(`session projection drive failed: ${error instanceof Error ? error.message : String(error)}`);
++			}
+ 		});
+ 	}
+ 	register(definition) {
