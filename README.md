@@ -1,4 +1,4 @@
-# DSH "Loading history…" hang: causes and patches
+# DeepSeek Harness (DSH) "Loading history…" hang: causes and patches
 
 Analysis, patches and a test suite for a bug in the web UI of DeepSeek Harness
 (DSH, npm `@deepseek-ai/dsh`) where a session view stays on **"Loading history…"**

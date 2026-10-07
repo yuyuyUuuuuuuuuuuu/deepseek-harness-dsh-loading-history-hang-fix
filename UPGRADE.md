@@ -93,7 +93,7 @@ ls "$DSH_HOME/profiles/web/cordis.patch.yml.bak-"*     # the backups
 At login (for example from `~/.bashrc`):
 
 ```bash
-/path/to/dsh-loading-hang-fix/patch-status.sh
+/path/to/deepseek-harness-dsh-loading-history-hang-fix/patch-status.sh
 ```
 
 Daily, with a systemd user timer. Add an `OnFailure=` line that points at your own
@@ -106,7 +106,7 @@ Description=Check that the DSH loading-hang patches are active
 
 [Service]
 Type=oneshot
-ExecStart=/path/to/dsh-loading-hang-fix/patch-status.sh
+ExecStart=/path/to/deepseek-harness-dsh-loading-history-hang-fix/patch-status.sh
 ```
 
 ```ini
