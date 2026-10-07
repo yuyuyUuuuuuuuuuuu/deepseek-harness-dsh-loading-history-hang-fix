@@ -7,6 +7,21 @@ and never shows the conversation.
 This is an independent community project and is not affiliated with DeepSeek.
 DSH is MIT-licensed; the patches here modify DSH code (see [NOTICE](NOTICE)).
 
+Symptom text to search for (browser console, Safari / WebKit):
+
+    TypeError: Assistant stream raw chunk must be a lossless JSON object
+
+| fact | value |
+|---|---|
+| affected | Safari on macOS and every browser on iPhone / iPad (WebKit); Firefox 155 has the same check (string output checked in headless Firefox only) |
+| not affected by D1 | Chrome, Edge, Node (V8) |
+| trigger | opening or reloading a session while a turn is running; the view recovers after the turn finishes |
+| cause (D1) | a lossless-JSON validator compares `Function.prototype.toString.call(Object)` with V8's exact output; JavaScriptCore puts newlines in that string |
+| other causes | WebSocket heartbeat drops (D3-D6) and more defects on the same paths (D7-D21) |
+| fix | 13 patches; `./install.sh` applies them to a copy of the runtime, `./install.sh --rollback` switches back |
+| versions | analysed and patched on 0.1.6-alpha.1 (byte-identical in 0.1.6-alpha.2); in 0.1.7-rc.2 the D1 validator is unchanged |
+| tests | `test/suite.sh`, `test/safari-jsc-check.sh`, `test/webkit-e2e.mjs` |
+
 ## At a glance
 
 **What goes wrong.** Several independent defects end on the same screen:

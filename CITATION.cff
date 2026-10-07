@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use these patches or this analysis, please cite this repository."
+title: "DeepSeek Harness (DSH) 'Loading history...' hang: causes and patches"
+type: software
+authors:
+  - alias: "yuyuyUuuuuuuuuuuu"
+repository-code: "https://github.com/yuyuyUuuuuuuuuuuu/deepseek-harness-dsh-loading-history-hang-fix"
+license: MIT
+date-released: "2026-09-25"
+abstract: "Analysis, 13 patches and a test suite for the DeepSeek Harness web UI staying on 'Loading history...': a lossless-JSON validator that fails on JavaScriptCore/WebKit (Safari, iPhone, iPad) and WebSocket heartbeat drops. Unofficial, not affiliated with DeepSeek."
+keywords: [DeepSeek Harness, DSH, Loading history, JavaScriptCore, WebKit, Safari, WebSocket]
